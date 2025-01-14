@@ -1,14 +1,19 @@
 import jax
 import math
-from enum import Enum
+from enum import Enum, auto
 from typing import Dict, Any, Callable
 
 
 class SchedulerEnum(Enum):
-    LinearLR = 1
-    CosineAnnealingLR = 2
+    Const = auto()
+    LinearLR = auto()
+    CosineAnnealingLR = auto()
 
-def linear_schedule(count: int, config: Dict[str, Any]) -> float:
+def const_scheduler(count: int, config: Dict[str, Any]) -> float:
+    learning_rate = config.get("LR", 1.0)
+    return learning_rate
+
+def linear_scheduler(count: int, config: Dict[str, Any]) -> float:
     num_mini_batch = config.get("NUM_MINIBATCHES", 1)
     update_epoches = config.get("UPDATE_EPOCHS", 1)
     num_updates = config.get("NUM_UPDATES", 1)
@@ -18,7 +23,7 @@ def linear_schedule(count: int, config: Dict[str, Any]) -> float:
 
     return learning_rate * frac
 
-def cosine_annealing_schedule(count: int, config: Dict[str, Any]) -> float:
+def cosine_annealing_scheduler(count: int, config: Dict[str, Any]) -> float:
     """
     Cosine Annealing learning rate schedule.
 
@@ -41,8 +46,9 @@ def cosine_annealing_schedule(count: int, config: Dict[str, Any]) -> float:
 
 # create a scheduler mapping dict
 scheduler_mapping = {
-    SchedulerEnum.LinearLR: linear_schedule,
-    SchedulerEnum.CosineAnnealingLR: cosine_annealing_schedule,
+    SchedulerEnum.Const: const_scheduler,
+    SchedulerEnum.LinearLR: linear_scheduler,
+    SchedulerEnum.CosineAnnealingLR: cosine_annealing_scheduler,
 }
 
 def get_scheduler_from_str(scheduler_str: str) -> SchedulerEnum:
@@ -69,8 +75,13 @@ def get_scheduler_handler(config: Dict[str, Any]) -> Callable[[int], float]:
     :param config: config dict, contain all parameters of scheduler
     :return: return a scheduler function, this function contains count and return a float number
     """
+    anneal_lr = config.get("ANNEAL_LR", "InvalidScheduer")
+    if not anneal_lr:
+        return scheduler_mapping[SchedulerEnum.Const]
+    
     scheduler_name = config.get("SCHEDULER", "InvalidScheduer")
-    if scheduler_name in scheduler_mapping:
-        return lambda count: scheduler_mapping[scheduler_name](count, config)
+    scheduler_type = get_scheduler_from_str(scheduler_name)
+    if scheduler_type in scheduler_mapping:
+        return lambda count: scheduler_mapping[scheduler_type](count, config)
     else:
         raise ValueError(f"Unknown scheduler name: {scheduler_name}")
